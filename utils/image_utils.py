@@ -12,6 +12,9 @@ def is_image_file(filename):
 def is_png_file(filename):
     return any(filename.endswith(extension) for extension in [".png"])
 
+def is_mat_file(filename):
+    return any(filename.endswith(extension) for extension in [".mat"])
+
 def is_pkl_file(filename):
     return any(filename.endswith(extension) for extension in [".pkl"])
 
@@ -26,6 +29,15 @@ def save_dict(dict_, filename_):
 
 def load_npy(filepath):
     img = np.load(filepath)
+    return img
+
+def load_mat(filepath, key):
+    import scipy.io as sio
+    img = sio.loadmat(filepath)[key]
+    h,w,c = img.shape
+    for i in range(c):
+        img[:, :, i] = img[:, :, i].astype(np.float32)
+        img[:,:,i] = img[:,:,i]/255.
     return img
 
 def load_img(filepath):
@@ -46,6 +58,7 @@ def myPSNR(tar_img, prd_img):
 def batch_PSNR(img1, img2, average=True):
     PSNR = []
     for im1, im2 in zip(img1, img2):
+        print(im1.shape, im2.shape)
         psnr = myPSNR(im1, im2)
         PSNR.append(psnr)
     return sum(PSNR)/len(PSNR) if average else sum(PSNR)

@@ -9,6 +9,7 @@ import math
 import numpy as np
 import time
 from torch import einsum
+from torch.nn import Conv2d
 
 
 class FastLeFF(nn.Module):
@@ -16,11 +17,9 @@ class FastLeFF(nn.Module):
     def __init__(self, dim=32, hidden_dim=128, act_layer=nn.GELU,drop = 0.):
         super().__init__()
 
-        from torch_dwconv import depthwise_conv2d, DepthwiseConv2d
-
         self.linear1 = nn.Sequential(nn.Linear(dim, hidden_dim),
                                 act_layer())
-        self.dwconv = nn.Sequential(DepthwiseConv2d(hidden_dim, hidden_dim, kernel_size=3,stride=1,padding=1),
+        self.dwconv = nn.Sequential(Conv2d(hidden_dim, hidden_dim, kernel_size=3,stride=1,padding=1),
                         act_layer())
         self.linear2 = nn.Sequential(nn.Linear(hidden_dim, dim))
         self.dim = dim
@@ -502,7 +501,7 @@ class WindowAttention(nn.Module):
         relative_position_bias = relative_position_bias.permute(2, 0, 1).contiguous()  # nH, Wh*Ww, Wh*Ww
         ratio = attn.size(-1)//relative_position_bias.size(-1)
         relative_position_bias = repeat(relative_position_bias, 'nH l c -> nH l (c d)', d = ratio)
-    
+
         attn = attn + relative_position_bias.unsqueeze(0)
 
         if mask is not None:
