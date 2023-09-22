@@ -13,3 +13,6 @@
 
 ### test on RealBlur ###
 # python3 test/test_realblur.py --input_dir ../datasets/deblurring/ --result_dir ./results/deblurring/ --weights ./logs/motiondeblur/GoPro/Uformer_B/models/model_best.pth
+
+### test on SARtoLoG ###
+python3 test/test_realblur.py --input_dir ../datasets/deblurring/ --result_dir ./results/deblurring/ --weights ./logs/sar/unicorn/Uformer_B/models/model_best.pth

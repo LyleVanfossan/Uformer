@@ -24,8 +24,8 @@ class DataLoaderTrain(Dataset):
 
         self.target_transform = target_transform
         
-        gt_dir = 'log_pyramid_images'
-        input_dir = 'eo_images'
+        gt_dir = 'SIFT'
+        input_dir = 'SAR'
         
         clean_files = sorted(os.listdir(os.path.join(rgb_dir, gt_dir)))
         noisy_files = sorted(os.listdir(os.path.join(rgb_dir, input_dir)))
@@ -43,10 +43,10 @@ class DataLoaderTrain(Dataset):
     def __getitem__(self, index):
         tar_index   = index % self.tar_size
         clean = torch.from_numpy(np.float32(load_mat(self.clean_filenames[tar_index], 'log_pyramid')))
-        noisy = torch.from_numpy(np.float32(load_img(self.noisy_filenames[tar_index])))
+        noisy = torch.from_numpy(np.expand_dims(np.float32(Image.open(self.noisy_filenames[tar_index])), 0))
         
-        clean = clean.permute(0,1,2)
-        noisy = noisy.permute(2,0,1)
+        #clean = clean.permute(2,0,1)
+        #noisy = noisy.permute(2,0,1)
 
         clean_filename = os.path.split(self.clean_filenames[tar_index])[-1]
         noisy_filename = os.path.split(self.noisy_filenames[tar_index])[-1]
@@ -66,7 +66,7 @@ class DataLoaderTrain(Dataset):
         clean = clean[:, r:r + ps, c:c + ps]
         noisy = noisy[:, r:r + ps, c:c + ps]
 
-        apply_trans = transforms_aug[random.getrandbits(3)]
+        apply_trans = transforms_aug[random.getrandbits(1)]
 
         clean = getattr(augment, apply_trans)(clean)
         noisy = getattr(augment, apply_trans)(noisy)        
@@ -81,8 +81,8 @@ class DataLoaderVal(Dataset):
 
         self.target_transform = target_transform
 
-        gt_dir = 'log_pyramid_images'
-        input_dir = 'eo_images'
+        gt_dir = 'SIFT'
+        input_dir = 'SAR'
         
         clean_files = sorted(os.listdir(os.path.join(rgb_dir, gt_dir)))
         noisy_files = sorted(os.listdir(os.path.join(rgb_dir, input_dir)))
@@ -99,12 +99,12 @@ class DataLoaderVal(Dataset):
         tar_index   = index % self.tar_size
 
         clean = torch.from_numpy(np.float32(load_mat(self.clean_filenames[tar_index], 'log_pyramid')))
-        noisy = torch.from_numpy(np.float32(load_img(self.noisy_filenames[tar_index])))
+        noisy = torch.from_numpy(np.expand_dims(np.float32(Image.open(self.noisy_filenames[tar_index])), 0))
         clean_filename = os.path.split(self.clean_filenames[tar_index])[-1]
         noisy_filename = os.path.split(self.noisy_filenames[tar_index])[-1]
 
-        clean = clean.permute(0,1,2)
-        noisy = noisy.permute(2,0,1)
+        # clean = clean.permute(2,0,1)
+        # noisy = noisy.permute(2,0,1)
 
         return clean, noisy, clean_filename, noisy_filename
 

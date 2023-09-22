@@ -34,10 +34,6 @@ def load_npy(filepath):
 def load_mat(filepath, key):
     import scipy.io as sio
     img = sio.loadmat(filepath)[key]
-    h,w,c = img.shape
-    for i in range(c):
-        img[:, :, i] = img[:, :, i].astype(np.float32)
-        img[:,:,i] = img[:,:,i]/255.
     return img
 
 def load_img(filepath):
@@ -47,7 +43,7 @@ def load_img(filepath):
     return img
 
 def save_img(filepath, img):
-    cv2.imwrite(filepath,cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+    cv2.imwrite(filepath, img)
 
 def myPSNR(tar_img, prd_img):
     imdff = torch.clamp(prd_img,0,1) - torch.clamp(tar_img,0,1)
@@ -58,7 +54,6 @@ def myPSNR(tar_img, prd_img):
 def batch_PSNR(img1, img2, average=True):
     PSNR = []
     for im1, im2 in zip(img1, img2):
-        print(im1.shape, im2.shape)
         psnr = myPSNR(im1, im2)
         PSNR.append(psnr)
     return sum(PSNR)/len(PSNR) if average else sum(PSNR)

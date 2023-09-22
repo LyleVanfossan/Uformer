@@ -20,7 +20,7 @@ class FastLeFF(nn.Module):
         self.linear1 = nn.Sequential(nn.Linear(dim, hidden_dim),
                                 act_layer())
         self.dwconv = nn.Sequential(Conv2d(hidden_dim, hidden_dim, kernel_size=3,stride=1,padding=1),
-                        act_layer())
+                        act_layer(), groups=hidden_dim)
         self.linear2 = nn.Sequential(nn.Linear(hidden_dim, dim))
         self.dim = dim
         self.hidden_dim = hidden_dim
@@ -1066,7 +1066,7 @@ class BasicUformerLayer(nn.Module):
 
 
 class Uformer(nn.Module):
-    def __init__(self, img_size=256, in_chans=3, dd_in=3,
+    def __init__(self, img_size=256, in_chans=1, dd_in=1,
                  embed_dim=32, depths=[2, 2, 2, 2, 2, 2, 2, 2, 2], num_heads=[1, 2, 4, 8, 16, 16, 8, 4, 2],
                  win_size=8, mlp_ratio=4., qkv_bias=True, qk_scale=None,
                  drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
@@ -1097,7 +1097,7 @@ class Uformer(nn.Module):
 
         # Input/Output
         self.input_proj = InputProj(in_channel=dd_in, out_channel=embed_dim, kernel_size=3, stride=1, act_layer=nn.LeakyReLU)
-        self.output_proj = OutputProj(in_channel=2*embed_dim, out_channel=in_chans, kernel_size=3, stride=1)
+        self.output_proj = OutputProj(in_channel=2*embed_dim, out_channel=4, kernel_size=3, stride=1)
         
         # Encoder
         self.encoderlayer_0 = BasicUformerLayer(dim=embed_dim,
@@ -1228,7 +1228,7 @@ class Uformer(nn.Module):
                             modulator=modulator,cross_modulator=cross_modulator)
         self.upsample_3 = upsample(embed_dim*4, embed_dim)
         self.decoderlayer_3 = BasicUformerLayer(dim=embed_dim*2,
-                            output_dim=embed_dim*2,
+                            output_dim=4,
                             input_resolution=(img_size,
                                                 img_size),
                             depth=depths[8],
@@ -1341,3 +1341,4 @@ if __name__ == "__main__":
     # print('{:<30}  {:<8}'.format('Number of parameters: ', params))
     print('# model_restoration parameters: %.2f M'%(sum(param.numel() for param in model_restoration.parameters())/ 1e6))
     print("number of GFLOPs: %.2f G"%(model_restoration.flops() / 1e9))
+

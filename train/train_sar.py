@@ -1,5 +1,8 @@
+import math
 import os
 import sys
+from torch.utils.tensorboard import SummaryWriter
+writer = SummaryWriter("./runs/Uformer_SAR2LoG_Test2")
 
 # add dir
 dir_name = os.path.dirname(os.path.abspath(__file__))
@@ -12,7 +15,7 @@ import argparse
 import options
 
 ######### parser ###########
-opt = options.Options().init(argparse.ArgumentParser(description='SAR image translation')).parse_args()
+opt = options.Options().init(argparse.ArgumentParser(description='SAR to LoG Image Translation')).parse_args()
 print(opt)
 
 import utils
@@ -39,9 +42,11 @@ from tqdm import tqdm
 from warmup_scheduler import GradualWarmupScheduler
 from torch.optim.lr_scheduler import StepLR
 from timm.utils import NativeScaler
-
+from skimage.metrics import mean_squared_error as mse
 # from utils.loader import  get_training_data,get_validation_data
 
+def torch_mean_squared_error(y_pred, y_true):
+    return torch.mean((y_true - y_pred) ** 2)
 
 ######### Logs dir ###########
 log_dir = os.path.join(opt.save_dir, 'sar', opt.dataset, opt.arch + opt.env)
@@ -146,18 +151,18 @@ with torch.no_grad():
         with torch.cuda.amp.autocast():
             restored = model_restoration(input_)
             restored = torch.clamp(restored, 0, 1)
-        psnr_dataset.append(utils.batch_PSNR(input_, target, False).item())
-        psnr_model_init.append(utils.batch_PSNR(restored, target, False).item())
-    psnr_dataset = sum(psnr_dataset) / len_valset
+        #psnr_dataset.append(mse(input_, target, False).item())
+        psnr_model_init.append(torch_mean_squared_error(restored, target).item())
+    #psnr_dataset = sum(psnr_dataset) / len_valset
     psnr_model_init = sum(psnr_model_init) / len_valset
-    print('Input & GT (PSNR) -->%.4f dB' % psnr_dataset, ', Model_init & GT (PSNR) -->%.4f dB' % psnr_model_init)
+    print('Model_init & GT (MSE) -->%.4f' % psnr_model_init)
 
 ######### train ###########
 print('===> Start Epoch {} End Epoch {}'.format(start_epoch, opt.nepoch))
-best_psnr = 0
+best_psnr = math.inf
 best_epoch = 0
 best_iter = 0
-eval_now = len(train_loader) // 4
+eval_now = len(train_loader)
 print("\nEvaluation after every {} Iterations !!!\n".format(eval_now))
 
 loss_scaler = NativeScaler()
@@ -188,7 +193,7 @@ for epoch in range(start_epoch, opt.nepoch + 1):
         if (i + 1) % eval_now == 0 and i > 0:
             with torch.no_grad():
                 model_restoration.eval()
-                psnr_val_rgb = []
+                mse_val_rgb = []
                 for ii, data_val in enumerate((val_loader), 0):
                     target = data_val[0].cuda()
                     input_ = data_val[1].cuda()
@@ -196,12 +201,13 @@ for epoch in range(start_epoch, opt.nepoch + 1):
                     with torch.cuda.amp.autocast():
                         restored = model_restoration(input_)
                     restored = torch.clamp(restored, 0, 1)
-                    psnr_val_rgb.append(utils.batch_PSNR(restored, target, False).item())
+                    mse_val_rgb.append(torch_mean_squared_error(restored, target).item())
+                   
 
-                psnr_val_rgb = sum(psnr_val_rgb) / len_valset
-
-                if psnr_val_rgb > best_psnr:
-                    best_psnr = psnr_val_rgb
+                mse_val_rgb = sum(mse_val_rgb) / len_valset
+                writer.add_scalar('Validation/MSE', mse_val_rgb, epoch)
+                if mse_val_rgb < best_psnr:
+                    best_psnr = mse_val_rgb
                     best_epoch = epoch
                     best_iter = i
                     torch.save({'epoch': epoch,
@@ -210,16 +216,17 @@ for epoch in range(start_epoch, opt.nepoch + 1):
                                 }, os.path.join(model_dir, "model_best.pth"))
 
                 print(
-                    "[Ep %d it %d\t PSNR SIDD: %.4f\t] ----  [best_Ep_SIDD %d best_it_SIDD %d Best_PSNR_SIDD %.4f] " % (
-                        epoch, i, psnr_val_rgb, best_epoch, best_iter, best_psnr))
+                    "[Ep %d it %d\t MSE: %.4f\t] ----  [best_Ep_SIDD %d best_it_SIDD %d Best_MSE %.4f] " % (
+                        epoch, i, mse_val_rgb, best_epoch, best_iter, best_psnr))
                 with open(logname, 'a') as f:
                     f.write(
-                        "[Ep %d it %d\t PSNR SIDD: %.4f\t] ----  [best_Ep_SIDD %d best_it_SIDD %d Best_PSNR_SIDD %.4f] " \
-                        % (epoch, i, psnr_val_rgb, best_epoch, best_iter, best_psnr) + '\n')
+                        "[Ep %d it %d\t MSE: %.4f\t] ----  [best_Ep_SIDD %d best_it_SIDD %d Best_MSE %.4f] " \
+                        % (epoch, i, mse_val_rgb, best_epoch, best_iter, best_psnr) + '\n')
                 model_restoration.train()
                 torch.cuda.empty_cache()
     scheduler.step()
-
+    writer.add_scalar('Train/LearningRate', scheduler.get_lr()[0], epoch)
+    writer.add_scalar('Train/Loss', epoch_loss, epoch)
     print("------------------------------------------------------------------")
     print("Epoch: {}\tTime: {:.4f}\tLoss: {:.4f}\tLearningRate {:.6f}".format(epoch, time.time() - epoch_start_time,
                                                                               epoch_loss, scheduler.get_lr()[0]))
@@ -229,7 +236,6 @@ for epoch in range(start_epoch, opt.nepoch + 1):
             "Epoch: {}\tTime: {:.4f}\tLoss: {:.4f}\tLearningRate {:.6f}".format(epoch, time.time() - epoch_start_time,
                                                                                 epoch_loss,
                                                                                 scheduler.get_lr()[0]) + '\n')
-
     torch.save({'epoch': epoch,
                 'state_dict': model_restoration.state_dict(),
                 'optimizer': optimizer.state_dict()
