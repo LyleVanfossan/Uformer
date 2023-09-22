@@ -143,23 +143,23 @@ print("Sizeof training set: ", len_trainset, ", sizeof validation set: ", len_va
 ######### validation ###########
 with torch.no_grad():
     model_restoration.eval()
-    psnr_dataset = []
-    psnr_model_init = []
+    mse_dataset = []
+    mse_model_init = []
     for ii, data_val in enumerate(val_loader, 0):
         target = data_val[0].cuda()
         input_ = data_val[1].cuda()
         with torch.cuda.amp.autocast():
             restored = model_restoration(input_)
             restored = torch.clamp(restored, 0, 1)
-        #psnr_dataset.append(mse(input_, target, False).item())
-        psnr_model_init.append(torch_mean_squared_error(restored, target).item())
-    #psnr_dataset = sum(psnr_dataset) / len_valset
-    psnr_model_init = sum(psnr_model_init) / len_valset
-    print('Model_init & GT (MSE) -->%.4f' % psnr_model_init)
+        #mse_dataset.append(mse(input_, target, False).item())
+        mse_model_init.append(torch_mean_squared_error(restored, target).item())
+    #mse_dataset = sum(mse_dataset) / len_valset
+    mse_model_init = sum(mse_model_init) / len_valset
+    print('Model_init & GT (MSE) -->%.4f' % mse_model_init)
 
 ######### train ###########
 print('===> Start Epoch {} End Epoch {}'.format(start_epoch, opt.nepoch))
-best_psnr = math.inf
+best_mse = math.inf
 best_epoch = 0
 best_iter = 0
 eval_now = len(train_loader)
@@ -206,8 +206,8 @@ for epoch in range(start_epoch, opt.nepoch + 1):
 
                 mse_val_rgb = sum(mse_val_rgb) / len_valset
                 writer.add_scalar('Validation/MSE', mse_val_rgb, epoch)
-                if mse_val_rgb < best_psnr:
-                    best_psnr = mse_val_rgb
+                if mse_val_rgb < best_mse:
+                    best_mse = mse_val_rgb
                     best_epoch = epoch
                     best_iter = i
                     torch.save({'epoch': epoch,
@@ -217,11 +217,11 @@ for epoch in range(start_epoch, opt.nepoch + 1):
 
                 print(
                     "[Ep %d it %d\t MSE: %.4f\t] ----  [best_Ep_SIDD %d best_it_SIDD %d Best_MSE %.4f] " % (
-                        epoch, i, mse_val_rgb, best_epoch, best_iter, best_psnr))
+                        epoch, i, mse_val_rgb, best_epoch, best_iter, best_mse))
                 with open(logname, 'a') as f:
                     f.write(
                         "[Ep %d it %d\t MSE: %.4f\t] ----  [best_Ep_SIDD %d best_it_SIDD %d Best_MSE %.4f] " \
-                        % (epoch, i, mse_val_rgb, best_epoch, best_iter, best_psnr) + '\n')
+                        % (epoch, i, mse_val_rgb, best_epoch, best_iter, best_mse) + '\n')
                 model_restoration.train()
                 torch.cuda.empty_cache()
     scheduler.step()
